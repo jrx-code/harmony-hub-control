@@ -2068,11 +2068,27 @@ local function commitRemoteBackground(request)
   end
   local snapshot = resourceSnapshot("Settings")
   if not snapshot then
-    return {
-      ok = false,
-      localOnly = true,
-      error = "this hub has no settings for a remote with a screen yet; " ..
-        "pair one and let it sync with the hub once"
+    -- A screen remote that never completed a cloud setup never uploads a
+    -- Settings resource, so a hub set up entirely offline has none and the
+    -- background could never be set (this writer used to refuse here). While
+    -- the cloud blocker is on, seed a minimal Settings so the picture is
+    -- stored and the remote applies it on its next sync; the save below
+    -- writes it to the resource store and publishes a revision.
+    if not blockerActive() then
+      return {
+        ok = false,
+        localOnly = true,
+        error = "this hub has no settings for a remote with a screen yet; " ..
+          "pair one and let it sync with the hub once"
+      }
+    end
+    snapshot = {
+      etag = localEtag(),
+      hetag = localHetag(),
+      resource = { Settings = {
+        { Name = "BackgroundImage", Values = {} },
+        { Name = "UserImages", Values = {} },
+      } }
     }
   end
   local settings = snapshot.resource
